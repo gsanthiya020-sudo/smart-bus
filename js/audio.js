@@ -1,7 +1,8 @@
 /**
  * SMART BUS OVERLOAD DETECTION & PASSENGER COUNTING SYSTEM
  * Audio Synthesizer (Web Audio API)
- * Generates alert chimes and emergency piezo buzzer alarms natively.
+ * 
+ * Simulates the physical 5V active piezo buzzer (GPIO 23) and IR sensor audio beeps.
  */
 
 class BusAudioSynthesizer {
@@ -10,8 +11,9 @@ class BusAudioSynthesizer {
     this.isMuted = false;
     this.alarmInterval = null;
     this.isAlarmPlaying = false;
-    
-    // Check saved mute preference
+    this.volume = 0.25;
+
+    // Load saved mute preference
     const savedMute = localStorage.getItem('smartbus_audio_muted');
     if (savedMute !== null) {
       this.isMuted = savedMute === 'true';
@@ -44,8 +46,12 @@ class BusAudioSynthesizer {
     return this.isMuted;
   }
 
+  setVolume(val) {
+    this.volume = Math.max(0, Math.min(1, val));
+  }
+
   // Tone generator helper
-  playTone(frequency, type = 'sine', duration = 0.15, volume = 0.2) {
+  playTone(frequency, type = 'sine', duration = 0.15, gainMultiplier = 1.0) {
     if (this.isMuted) return;
     this.init();
     if (!this.audioCtx) return;
@@ -57,7 +63,8 @@ class BusAudioSynthesizer {
       osc.type = type; // 'sine', 'square', 'sawtooth', 'triangle'
       osc.frequency.setValueAtTime(frequency, this.audioCtx.currentTime);
 
-      gain.gain.setValueAtTime(volume, this.audioCtx.currentTime);
+      const targetGain = this.volume * gainMultiplier;
+      gain.gain.setValueAtTime(targetGain, this.audioCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.0001, this.audioCtx.currentTime + duration);
 
       osc.connect(gain);
@@ -73,46 +80,45 @@ class BusAudioSynthesizer {
   // Beep when passenger enters (IR Sensor 1)
   playPassengerEnter() {
     if (this.isMuted) return;
-    this.playTone(880, 'sine', 0.1, 0.15); // A5 high pleasant blip
+    // Pleasant ascending chime (980 Hz)
+    this.playTone(980, 'sine', 0.1, 0.7);
   }
 
   // Beep when passenger exits (IR Sensor 2)
   playPassengerExit() {
     if (this.isMuted) return;
-    this.playTone(660, 'sine', 0.1, 0.15); // E5 lower pleasant blip
+    // Pleasant lower chime (620 Hz)
+    this.playTone(620, 'sine', 0.1, 0.7);
   }
 
   // Double beep when warning threshold (80%) reached
   playWarningChime() {
     if (this.isMuted) return;
     this.init();
-    this.playTone(740, 'triangle', 0.18, 0.25);
+    this.playTone(850, 'triangle', 0.16, 0.9);
     setTimeout(() => {
-      this.playTone(740, 'triangle', 0.18, 0.25);
-    }, 220);
+      this.playTone(850, 'triangle', 0.16, 0.9);
+    }, 200);
   }
 
-  // Rapid urgent piezo buzzer pattern for Overload Condition
+  // Urgent piezo buzzer alarm pattern for Overload Condition (2.4 kHz)
   startOverloadAlarm() {
     if (this.isMuted || this.isAlarmPlaying) return;
     this.init();
     this.isAlarmPlaying = true;
 
-    const triggerBurst = () => {
+    // Rapid pulsing piezo tone at 2400 Hz (authentic ESP32 piezo frequency)
+    const playBeep = () => {
       if (!this.isAlarmPlaying || this.isMuted) return;
-      
-      // Hardware piezo buzzer sound: harsh square wave pulse at 2400 Hz (standard buzzer resonant freq)
-      this.playTone(2400, 'square', 0.12, 0.3);
+      this.playTone(2400, 'square', 0.12, 0.85);
       setTimeout(() => {
-        if (this.isAlarmPlaying) this.playTone(2400, 'square', 0.12, 0.3);
+        if (!this.isAlarmPlaying || this.isMuted) return;
+        this.playTone(2400, 'square', 0.12, 0.85);
       }, 160);
-      setTimeout(() => {
-        if (this.isAlarmPlaying) this.playTone(2800, 'square', 0.20, 0.35);
-      }, 320);
     };
 
-    triggerBurst();
-    this.alarmInterval = setInterval(triggerBurst, 1200);
+    playBeep();
+    this.alarmInterval = setInterval(playBeep, 650);
   }
 
   stopOverloadAlarm() {
@@ -122,7 +128,13 @@ class BusAudioSynthesizer {
       this.alarmInterval = null;
     }
   }
+
+  // Sound test button for testing the hardware buzzer in the dashboard
+  testBuzzer() {
+    this.init();
+    this.playTone(2400, 'square', 0.35, 1.0);
+  }
 }
 
-// Global instance
+// Global audio synthesizer instance
 window.busAudio = new BusAudioSynthesizer();

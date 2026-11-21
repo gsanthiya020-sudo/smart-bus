@@ -1,175 +1,115 @@
 # Smart Bus Overload Detection and Passenger Counting System
 
 > **Department of Electronics and Communication Engineering (ECE)**  
-> **Final-Year Capstone Project / IoT Telematics Demonstration**  
-> **Technology Stack:** HTML5, Modern CSS3 (Tailwind CSS), Vanilla JavaScript (ES6+), Chart.js, Web Audio API, ESP32/Arduino C++ Embedded Firmware.
+> **Engineering Capstone Project / IoT Telematics Software Simulation**  
+> **Technology Stack:** HTML5, Modern CSS3 (Tailwind CSS), Vanilla JavaScript (ES6+), Chart.js, Web Audio API, Simulated ESP32 Microcontroller, HX711 24-bit ADC, Load Cells, IR Optical Sensors.
 
 ---
 
 ## 1. Project Overview & Objective
 
-Public transport buses often face extreme overcrowding during peak hours. Overloading compromises passenger safety, strains braking systems, increases rollover risk, accelerates vehicle chassis fatigue, and leads to premature tyre failures.
+Public transport buses often face extreme overcrowding during peak hours. Overloading compromises passenger safety, strains braking systems, increases rollover risk, accelerates chassis fatigue, and leads to premature tyre failures.
 
 The **Smart Bus Overload Detection and Passenger Counting System** is an IoT-enabled telematics solution that:
-1. **Tracks Headcount via Ingress/Egress Sensors:** Uses optical infrared (IR) beam sensors at both doors to accurately maintain a digital tally of passengers entering and exiting the bus.
-2. **Monitors Total Payload via Load Cells:** Leverages 4-point shear beam load cells connected to a 24-bit HX711 ADC to measure the real-time gross weight of passengers.
-3. **Detects Overload on Dual Criteria:** Unlike basic counters, the system monitors **both passenger count AND gross passenger payload weight**. Overload is flagged if either headcount exceeds the vehicle limit OR the payload weight breaches safe chassis ratings (e.g., in cases of heavy passenger luggage).
-4. **Delivers Driver & Conductor Alerts:** Features real-time visual alerts (normal green, capacity warning orange, critical overload red), an onboard 16x2 I2C LCD status readout, and an audible 2.4 kHz piezo buzzer.
-5. **Provides Cloud Telematics & CSV Reporting:** Generates regulatory safety compliance logs, hourly flow trends, axle balance metrics, and one-click downloadable CSV audit reports.
+1. **Simulates Passenger Flow (Ingress / Egress):** Passengers enter through Door 1 and exit through Door 2. Optical infrared (IR) beam break sensors accurately detect entries and exits.
+2. **Dynamically Calculates Individual & Total Passenger Weight:** For each passenger entering the bus, a realistic weight between **35 kg and 100 kg** is generated and stored. Total passenger weight is calculated automatically. When a passenger exits, their specific stored weight is deducted.
+3. **Simulates Load Cells & HX711 24-Bit ADC:** 4-point shear beam load cells provide continuous weight readings with optional road vibration sensor noise ($\pm 0.1$ to $2.0\text{ kg}$).
+4. **Detects Overload on Dual Criteria:** Monitors **both passenger headcount AND gross payload weight**. Real-time warnings fire when approaching safe limits (80% warning buffer) or exceeding certified capacity (>100% overload).
+5. **Provides Driver Alerts & Actuators:** Features real-time visual alerts (safe green, capacity warning amber, emergency red strobe), an onboard 16x2 I2C LCD character readout, and an authentic 2.4 kHz piezo buzzer simulation using the Web Audio API.
 
 ---
 
-## 2. System Architecture
+## 2. Professional Dashboard (8 Dedicated Sections)
 
-```
-+-----------------------------------------------------------------------------------+
-|                            BUS HARDWARE LAYER (PHYSICAL)                         |
-|                                                                                   |
-|  [IR Entry Sensor]       [IR Exit Sensor]       [4x Shear Load Cells (1000kg)]    |
-|      (GPIO 18)               (GPIO 19)                         |                  |
-|          |                       |                      [HX711 24-bit ADC]        |
-|          |                       |                        (DT:4, SCK:5)           |
-|          +------------+----------+-----------------------------+                  |
-|                       |                                                           |
-|                       v                                                           |
-|            +-----------------------+                                              |
-|            |   ESP32 DevKit V1     | <---- FreeRTOS / Arduino C++ Firmware        |
-|            | (240MHz Dual-Core)    |                                              |
-|            +-----------+-----------+                                              |
-|                        |                                                          |
-|       +----------------+----------------+                                         |
-|       v                                 v                                         |
-|  [16x2 I2C LCD]                 [5V Piezo Buzzer]                                 |
-|  (SDA:21, SCL:22)                   (GPIO 23)                                     |
-+-----------------------------------------------------------------------------------+
-                                 |
-         Serial Telemetry (115200 Baud) / WiFi MQTT JSON Stream
-                                 |
-                                 v
-+-----------------------------------------------------------------------------------+
-|                        TELEMATICS WEB DASHBOARD (SOFTWARE)                        |
-|                                                                                   |
-|  +--------------------+  +--------------------+  +-----------------------------+  |
-|  | Live Headcount     |  | Gross Weight Scale |  | Dual-Axis Trend Graphs      |  |
-|  | Digital LED Display|  | Radial Load Gauge  |  | (Passengers vs Payload kg)  |  |
-|  +--------------------+  +--------------------+  +-----------------------------+  |
-|  +--------------------+  +--------------------+  +-----------------------------+  |
-|  | Seat Heatmap &     |  | Overload Alert     |  | Daily Regulatory Compliance |  |
-|  | Aisle Standing Plan|  | Audio Synthesizer  |  | & CSV Audit Exporter        |  |
-|  +--------------------+  +--------------------+  +-----------------------------+  |
-+-----------------------------------------------------------------------------------+
-```
+The web dashboard is designed with a modern dark-blue and white transportation theme (`#0A1128`, `#001F54`, `#111C3A`, `#172448`):
 
----
+1. **Live Bus Simulation:**
+   - Visual representation of the public bus cabin with driver cab, steering wheel, entry door, exit door, and 40 passenger seats.
+   - **Human Icons:** Stylized human avatars indicate occupied seats and aisle standing passengers with individual weights displayed on hover.
+   - **Simulation Controls:** `Add Passenger`, `Remove Passenger`, `Add 5 Passengers`, `Remove 5 Passengers`, `Start Simulation`, `Pause Simulation`, and `Reset Simulation`.
+   - Live route progression along 9 transit bus stops (Majestic Central $\rightarrow$ ITPL Tech Park).
 
-## 3. Hardware Circuit Wiring & Pinout Specifications
+2. **Passenger Monitoring:**
+   - Digital headcount counter, seated vs. aisle standing breakdown, occupancy percentage, and ingress/egress totals.
+   - Live Onboard Passenger Manifest with individual passenger weights (PAX-ID, seat #, weight kg, boarding stop, time).
 
-| Component | Hardware Module | ESP32 Pin Assignment | Logic / Interface | Purpose |
-|---|---|---|---|---|
-| **Weight Amplifier** | HX711 24-bit ADC | **DT: GPIO 4, SCK: GPIO 5** | 2-wire Serial Bus | Reads differential bridge voltage from 4 load cells |
-| **Door Ingress Sensor** | Sharp GP2Y0A21 / IR Obstacle | **GPIO 18** (Input Pullup) | Active LOW Digital | Detects entering passenger (increments count) |
-| **Door Egress Sensor** | Sharp GP2Y0A21 / IR Obstacle | **GPIO 19** (Input Pullup) | Active LOW Digital | Detects departing passenger (decrements count) |
-| **Warning Buzzer** | 5V Active Piezo Buzzer | **GPIO 23** | Digital Output / PWM | Sounds loud 2.4 kHz audible alarm during overload |
-| **Normal Status LED** | 5mm Green LED | **GPIO 2** | Digital Active HIGH | Visual indication of safe passenger load |
-| **Overload Status LED**| 5mm Red LED | **GPIO 15** | Digital Active HIGH | Visual indication of dangerous capacity overload |
-| **Cabin Display** | 16x2 Character LCD + PCF8574 | **SDA: GPIO 21, SCL: GPIO 22** | I2C (Address `0x27`) | Real-time cockpit display for driver/conductor |
+3. **Weight Monitoring:**
+   - Radial payload capacity gauge (0% to 120%), gross passenger payload weight, certified maximum weight, average passenger weight, and remaining weight capacity.
+   - Dual axle load distribution balance (Front Axle ~44% vs. Rear Axle ~56%).
+   - HX711 24-bit ADC signal conditioning panel: raw digital counts, Wheatstone bridge output voltage (mV), and tare zero-calibration button.
+
+4. **Overload Detection:**
+   - Dual-criteria matrix: Headcount Check ($N > N_{\text{max}}$) and Gross Payload Weight Check ($W > W_{\text{max}}$).
+   - 3-level safety indicator: Normal (<80%), Warning buffer (80%-100%), and Overload (>100%).
+   - Automatic passenger door safety interlock status.
+
+5. **Sensor Simulation:**
+   - Interactive IR Sensor 1 (Entry) & IR Sensor 2 (Exit) with animated optical beam breaker and manual trip test buttons.
+   - ESP32 microcontroller telemetry (CPU 240 MHz, cycle time, GPIO 18, 19, 4, 5, 23, 21, 22 pinout).
+   - Virtual 16x2 I2C character LCD display with green backlight and dot-matrix characters.
+   - Flash-ready Arduino / ESP32 C++ firmware source code viewer.
+
+6. **Alert System:**
+   - Active alarm banner with acknowledgement button.
+   - Synthesized 2.4 kHz piezo buzzer with volume control and audio mute toggle.
+   - Overload incident audit log table.
+
+7. **Statistics and Reports:**
+   - Real-time dual-axis timeline chart (Passenger Count vs Payload Weight).
+   - Passenger Weight Distribution Histogram (grouping onboard passengers: 35-50 kg, 51-65 kg, 66-80 kg, 81-100 kg).
+   - Hourly ridership flow chart (Boarded vs Alighted).
+   - One-click **Download Full CSV Report** for transportation authority audits.
+
+8. **Settings:**
+   - Configurable bus passenger capacity (default 50 persons).
+   - Configurable maximum safe weight (default 3,500 kg).
+   - Configurable warning buffer threshold (default 80%).
+   - Configurable sensor vibration noise level (kg).
+   - Fleet metadata (Bus number, Route number, Terminals, Driver credentials).
 
 ---
 
-## 4. Overload Detection Algorithm
+## 3. Bus Simulation Controls
 
-The evaluation function executes on every passenger ingress, egress, or weight delta:
+The toolbar and simulation deck provide the 7 required interactive controls:
 
-$$\text{Count Occupancy (\%)} = \left(\frac{N_{\text{current}}}{N_{\text{max}}}\right) \times 100$$
-
-$$\text{Weight Load (\%)} = \left(\frac{W_{\text{gross}}}{W_{\text{max\_safe}}}\right) \times 100$$
-
-### Decision Truth Matrix:
-
-| Condition | Headcount ($N$) | Gross Weight ($W$) | Indicator Status | Audio Alarm | Conductor Action |
-|---|---|---|---|---|---|
-| **NORMAL** | $< 80\%$ Max | $< 80\%$ Safe Limit | **GREEN** (`BUS LOAD NORMAL`) | OFF | Unrestricted boarding |
-| **WARNING** | $\ge 80\%$ or | $\ge 80\%$ Safe Limit | **ORANGE** (`BUS APPROACHING CAPACITY`) | Warning Chime | Advise passengers nearing capacity |
-| **OVERLOAD** | $> 100\%$ or | $> 100\%$ Safe Limit | **RED FLASH** (`OVERLOAD DETECTED`) | Continuous 2.4 kHz Pulse | **Halt boarding immediately** |
-
-*Note: If heavy freight or luggage is loaded, the bus can enter **Overload** condition on weight even if seat headcount is only 30/50.*
+| Control | Description |
+|---|---|
+| **Add Passenger** | Breaks IR Sensor 1 beam, increments passenger count by 1, generates individual weight (35-100 kg), updates total payload weight, recalculates load status, and plays entry chime. |
+| **Remove Passenger** | Breaks IR Sensor 2 beam, decrements passenger count by 1, removes exiting passenger's stored weight from total payload, updates load status, and plays exit chime. Never allows count to drop below 0. |
+| **Add 5 Passengers** | Simulates rapid batch boarding of 5 passengers with staggered IR 1 beam breaks. |
+| **Remove 5 Passengers** | Simulates rapid batch alighting of 5 passengers with staggered IR 2 beam breaks. |
+| **Start Simulation** | Starts autonomous transit mode where the bus drives between bus stops, with passengers boarding and alighting at each stop. |
+| **Pause Simulation** | Pauses the autonomous transit simulation. |
+| **Reset Simulation** | Clears all passengers, resets load cell scale, and sets headcount to 0. |
 
 ---
 
-## 5. Key Dashboard Features
+## 4. Passenger Weight & Load Cell Simulation
 
-### 1. Dashboard Overview
-- Live KPI status tiles: Passenger Count, Gross Weight, Available Space, and 16x2 LCD mirror.
-- Bus Cabin Occupancy Blueprint: 40 numbered passenger seats that illuminate green/orange/red, plus dynamic aisle standing indicators.
-- Live Telemetry Trend Chart: Real-time dual-axis synchronization of count and weight.
-- Axle Balance Analysis: Front vs. Rear axle dynamic load division.
-
-### 2. Live Passenger Monitoring
-- Ultra-large digital LED counter for cockpit visibility.
-- Real-time tally of daily ingress (passengers boarded) and egress (passengers alighted).
-- Peak simultaneous ridership tracking.
-
-### 3. Weight Monitoring
-- High-precision kg readout with tare zero-calibration reference.
-- Interactive radial gauge displaying 0% to 120% safe payload utilization.
-- Compliance badge verifying adherence to CMV Rule 125 axle loading safety limits.
-
-### 4. Overload Alerts & Log
-- Emergency flashing warning banner with immediate driver acknowledgement button.
-- Native Web Audio API synthesizer emitting realistic 2.4 kHz piezo alarm pulses.
-- Auditable incident table with unique incident ID, timestamp, trigger reason, and action taken.
-
-### 5. Passenger Statistics & Analytics
-- Multi-hour passenger flow bar charts comparing hourly boardings vs alightings.
-- Live calculation of dynamic average passenger weight ($\text{Weight} / \text{Headcount}$).
-
-### 6. Bus Information & Admin Settings
-- Modal configuration interface to calibrate:
-  - Bus Number, Route Number, Starting Terminal, Destination.
-  - Driver and Conductor credential badges.
-  - Max safe passenger capacity and maximum payload weight limits.
-  - Warning threshold percentage ($50\%$ - $95\%$).
-- All configuration changes immediately persist in the browser's `localStorage`.
-
-### 7. Reports & CSV Export
-- Daily summary table (Daily Boardings, Overload Incidents, Max Weight, Mean Occupancy).
-- One-click **Download CSV Report** generating properly formatted spreadsheet records for transportation authorities.
-
-### 8. Hardware Integration & IoT Lab
-- Live status indicators for ESP32, HX711, IR sensors, and Buzzer.
-- Complete Arduino / ESP32 C++ firmware viewer with copy button.
-- Toggle between **Simulated Sensors** and **Physical Hardware Bridge**.
-- Interactive sensor simulation controls (+1 Pax, -1 Pax, Rapid Board, Overload Scenario, Normal Scenario, Depot Reset, Route Progression).
+- **Demographic Weights:** Every passenger entering the bus receives a realistic weight strictly between **35 kg and 100 kg**.
+- **Dynamic Summation:** Total passenger weight is the mathematical sum of all onboard passengers' weights.
+- **Individual Weight Deduction:** When a passenger departs, their exact stored weight is subtracted from the gross payload weight.
+- **Continuous Load Cell Readings:** 4 corner load cells (Front-Left, Front-Right, Rear-Left, Rear-Right) calculate load distribution continuously.
+- **Road Vibration Noise:** An optional sensor noise simulation adds minor dynamic fluctuations ($\pm 0.6\text{ kg}$) to simulate engine and road vibration on the HX711 24-bit ADC.
 
 ---
 
-## 6. How to Run the Project
+## 5. How to Run the Project
 
-No Node.js, Python, or external build server installation is required. The project is completely self-contained with modern modular JavaScript and CSS:
+No Node.js or Python backend is required to run the simulation. It is completely self-contained:
 
-1. Navigate to the project folder:
+1. Open the project folder:
    ```text
    C:\Users\gsant\.gemini\antigravity\scratch\smart-bus-overload-system\
    ```
-2. Double-click **`index.html`** to open it directly in Google Chrome, Microsoft Edge, Mozilla Firefox, or any modern web browser.
-3. The dashboard will launch immediately with full interactive simulations, dynamic charts, audio synthesizer, and reports.
-
----
-
-## 7. College Presentation & Viva Questions
-
-### Q1: Why use both IR sensors and Load Cells instead of just one?
-> **Answer:** An IR sensor alone can only count people; it cannot detect if passengers are carrying heavy luggage, cargo, or school bags that push the vehicle over its gross vehicle weight (GVW) limit. Conversely, load cells alone cannot differentiate between 5 heavy adults or 8 children. Combining both provides complete situational awareness.
-
-### Q2: What is the HX711 and why is it needed?
-> **Answer:** Load cells produce microscopic changes in resistance that output tiny differential voltages (a few millivolts). The HX711 is a specialized 24-bit analog-to-digital converter (ADC) with an integrated low-noise programmable gain amplifier (PGA) capable of amplifying and digitizing these minute signals with high precision.
-
-### Q3: How do the IR sensors avoid double counting when passengers stand in the doorway?
-> **Answer:** In hardware firmware, debounce timers and state-transition edge detection (interrupts) ensure that only a complete transition from beam-unbroken $\rightarrow$ beam-interrupted $\rightarrow$ beam-restored registers as a single count event.
-
----
-
-## 8. Author & Project Metadata
-- **Project Title:** Smart Bus Overload Detection and Passenger Counting System
-- **Domain:** Embedded Systems & IoT / Intelligent Transportation Systems (ITS)
-- **Status:** Fully Functional & Tested Telematics Web Application
+2. Double-click **`index.html`** to open it in Chrome, Edge, Firefox, or any modern web browser.
+3. Alternatively, run the local server script:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\start-server.ps1
+   ```
+   Or with Node.js:
+   ```bash
+   npx serve . -l 3000
+   ```
+4. Access the dashboard at `http://localhost:3000`.

@@ -11,5 +11,9 @@ $RECYCLE.BIN/
 *.swp
 *.swo
 
+# Node dependencies
+node_modules/
+npm-debug.log*
+
 # Logs
 *.log

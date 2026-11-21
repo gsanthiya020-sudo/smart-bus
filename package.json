@@ -1,0 +1,24 @@
+{
+  "name": "smart-bus-overload-system",
+  "version": "1.0.0",
+  "description": "Smart Bus Overload Detection and Passenger Counting System - IoT Telematics Dashboard",
+  "main": "index.html",
+  "scripts": {
+    "dev": "serve . -l 3000",
+    "start": "serve . -l 3000",
+    "serve": "serve ."
+  },
+  "keywords": [
+    "smart-bus",
+    "iot",
+    "overload-detection",
+    "passenger-counting",
+    "esp32",
+    "telematics"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.7"
+  }
+}

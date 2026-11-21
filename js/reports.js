@@ -1,6 +1,9 @@
 /**
  * SMART BUS OVERLOAD DETECTION & PASSENGER COUNTING SYSTEM
  * Reports Generation & CSV Export Utility
+ * 
+ * Generates transit compliance audit logs, onboard passenger weight manifests,
+ * and comprehensive CSV reports for engineering evaluation.
  */
 
 class BusReportsManager {
@@ -15,54 +18,87 @@ class BusReportsManager {
     const incidents = window.busState.incidents;
     const config = window.busState.config;
     const stats = window.busState.stats;
+    const live = window.busState.live;
+    const passengers = window.busState.passengers;
     const today = new Date().toISOString().split('T')[0];
 
     // CSV Headers & Meta Information
-    let csvContent = "data:text/csv;charset=utf-8,";
+    let csv = "data:text/csv;charset=utf-8,";
     
     // Header block
-    csvContent += "SMART BUS OVERLOAD DETECTION AND PASSENGER COUNTING SYSTEM - AUDIT REPORT\n";
-    csvContent += `Generated At,${new Date().toLocaleString()}\n`;
-    csvContent += `Bus Number,${config.busNumber}\n`;
-    csvContent += `Route,${config.routeNumber} (${config.startingPoint} -> ${config.destination})\n`;
-    csvContent += `Max Allowed Capacity,${config.maxPassengerCapacity} Passengers\n`;
-    csvContent += `Max Safe Payload Weight,${config.maxPermittedWeightKg} kg\n\n`;
+    csv += "SMART BUS OVERLOAD DETECTION AND PASSENGER COUNTING SYSTEM\n";
+    csv += "ECE IoT Engineering Project Simulation - Compliance & Telematics Audit Report\n";
+    csv += `Report Generated At,${new Date().toLocaleString()}\n`;
+    csv += `Bus Registration Number,${config.busNumber}\n`;
+    csv += `Route Number,${config.routeNumber} (${config.startingPoint} -> ${config.destination})\n`;
+    csv += `Assigned Driver,${config.driverName}\n`;
+    csv += `Assigned Conductor,${config.conductorName}\n`;
+    csv += `Max Permitted Headcount,${config.maxPassengerCapacity} Passengers\n`;
+    csv += `Max Certified Payload Weight,${config.maxPermittedWeightKg} kg\n`;
+    csv += `Warning Buffer Threshold,${config.warningThresholdPercent}%\n\n`;
 
-    // Summary Section
-    csvContent += "--- DAILY PERFORMANCE SUMMARY ---\n";
-    csvContent += "Metric,Value\n";
-    csvContent += `Total Passengers Boarded Today,${stats.totalEnteredToday}\n`;
-    csvContent += `Total Passengers Alighted Today,${stats.totalExitedToday}\n`;
-    csvContent += `Peak Passenger Count Recorded,${stats.peakPassengerCount} pax\n`;
-    csvContent += `Maximum Recorded Weight,${stats.maxRecordedWeightKg} kg\n`;
-    csvContent += `Total Overload Incidents,${stats.overloadIncidentCount}\n`;
-    csvContent += `Average Occupancy Rate,${stats.averageOccupancyPercent}%\n\n`;
+    // Section 1: Real-time Telemetry Snapshot
+    csv += "--- CURRENT LIVE TELEMETRY SNAPSHOT ---\n";
+    csv += "Metric,Current Reading,Unit,Operating Safety Status\n";
+    csv += `Passenger Count,${live.passengerCount},Persons,${live.passengerCount > config.maxPassengerCapacity ? 'OVERLOAD' : 'NORMAL'}\n`;
+    csv += `Total Payload Weight,${live.totalWeightKg},kg,${live.totalWeightKg > config.maxPermittedWeightKg ? 'OVERLOAD' : 'NORMAL'}\n`;
+    csv += `Average Passenger Weight,${live.avgPassengerWeightKg},kg,Calculated Mean\n`;
+    csv += `Remaining Weight Capacity,${live.remainingWeightCapacityKg},kg,Payload Headroom\n`;
+    csv += `Front Axle Load (Load Cells 1+2),${live.frontAxleWeightKg},kg,Balanced\n`;
+    csv += `Rear Axle Load (Load Cells 3+4),${live.rearAxleWeightKg},kg,Balanced\n`;
+    csv += `Chassis Safety Status,${live.status},-,${live.statusMessage}\n\n`;
 
-    // Overload Incidents Log Section
-    csvContent += "--- OVERLOAD & CAPACITY INCIDENT LOGS ---\n";
-    csvContent += "Incident ID,Date,Timestamp,Trigger Cause,Passenger Count,Max Capacity,Total Weight (kg),Max Permitted (kg),Severity,Resolution Status\n";
+    // Section 2: Daily Performance Summary
+    csv += "--- DAILY PERFORMANCE SUMMARY ---\n";
+    csv += "Summary Metric,Daily Value\n";
+    csv += `Total Passengers Boarded (IR 1),${stats.totalEnteredToday}\n`;
+    csv += `Total Passengers Alighted (IR 2),${stats.totalExitedToday}\n`;
+    csv += `Peak Simultaneous Headcount,${stats.peakPassengerCount} passengers\n`;
+    csv += `Peak Recorded Payload Weight,${stats.maxRecordedWeightKg} kg\n`;
+    csv += `Total Overload Incidents Triggered,${stats.overloadIncidentCount}\n`;
+    csv += `Average Fleet Occupancy Rate,${stats.averageOccupancyPercent}%\n\n`;
+
+    // Section 3: Onboard Passenger Manifest with Individual Weights
+    csv += "--- CURRENT ONBOARD PASSENGER MANIFEST (INDIVIDUAL WEIGHTS) ---\n";
+    csv += "Passenger ID,Assigned Seat,Individual Weight (kg),Demographic Category,Boarding Time,Boarding Stop\n";
+    if (passengers.length === 0) {
+      csv += "NONE,N/A,0.0,Bus Empty,N/A,N/A\n";
+    } else {
+      passengers.forEach(p => {
+        let category = 'Adult';
+        if (p.weight <= 50) category = 'Youth / Child';
+        else if (p.weight <= 65) category = 'Medium Adult';
+        else if (p.weight > 80) category = 'Heavy Adult / Baggage';
+        csv += `${p.id},${p.seatNumber},${p.weight},${category},${p.enteredAt},${p.stopName}\n`;
+      });
+    }
+    csv += "\n";
+
+    // Section 4: Overload Incidents Audit Log
+    csv += "--- OVERLOAD & SAFETY INCIDENT LOGS ---\n";
+    csv += "Incident ID,Date,Timestamp,Trigger Cause,Headcount,Max Capacity,Weight (kg),Max Weight (kg),Severity,Action Taken\n";
 
     if (incidents.length === 0) {
-      csvContent += "NONE,N/A,N/A,No overload incidents logged during this reporting period,N/A,N/A,N/A,N/A,NORMAL,COMPLIANT\n";
+      csv += "NONE,N/A,N/A,No overload incidents recorded,N/A,N/A,N/A,N/A,NORMAL,COMPLIANT\n";
     } else {
       incidents.forEach(inc => {
         const cleanCause = `"${(inc.cause || '').replace(/"/g, '""')}"`;
         const cleanAction = `"${(inc.actionTaken || '').replace(/"/g, '""')}"`;
-        csvContent += `${inc.id},${inc.date || today},${inc.timestamp},${cleanCause},${inc.passengerCount},${config.maxPassengerCapacity},${inc.totalWeightKg},${config.maxPermittedWeightKg},${inc.severity},${cleanAction}\n`;
+        csv += `${inc.id},${inc.date || today},${inc.timestamp},${cleanCause},${inc.passengerCount},${config.maxPassengerCapacity},${inc.totalWeightKg},${config.maxPermittedWeightKg},${inc.severity},${cleanAction}\n`;
       });
     }
 
     // Trigger Download
-    const encodedUri = encodeURI(csvContent);
+    const encodedUri = encodeURI(csv);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `SmartBus_Overload_Report_${config.busNumber.replace(/[^a-zA-Z0-9]/g, '_')}_${today}.csv`);
+    link.setAttribute("download", `SmartBus_Overload_AuditReport_${config.busNumber.replace(/[^a-zA-Z0-9]/g, '_')}_${today}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 
     if (window.showAppNotification) {
-      window.showAppNotification("CSV Export Complete", "Daily overload telemetry audit report downloaded successfully.", "success");
+      window.showAppNotification("CSV Export Complete", "Daily audit report downloaded with onboard passenger weights and incident logs.", "success");
     }
   }
 
@@ -95,44 +131,63 @@ class BusReportsManager {
       }
 
       tableBody.innerHTML = incidents.map(inc => {
-        const isWeight = inc.cause.toLowerCase().includes('weight');
         const badgeColor = inc.severity.includes('CRITICAL') 
           ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' 
           : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
 
         return `
-          <tr class="border-b border-slate-800 hover:bg-slate-800/40 transition-colors">
-            <td class="px-4 py-3 font-mono-code text-cyan-400 font-semibold text-xs">${inc.id}</td>
-            <td class="px-4 py-3 text-slate-300 text-xs">
-              <div>${inc.timestamp}</div>
-              <div class="text-[10px] text-slate-500">${inc.date || 'Today'}</div>
-            </td>
+          <tr class="hover:bg-slate-800/40 transition">
+            <td class="px-4 py-3 font-mono-code font-bold text-cyan-400">${inc.id}</td>
+            <td class="px-4 py-3 font-mono-code text-slate-300">${inc.timestamp}</td>
+            <td class="px-4 py-3 font-semibold text-white">${inc.cause}</td>
+            <td class="px-4 py-3 font-digital text-cyan-300">${inc.passengerCount}</td>
+            <td class="px-4 py-3 font-digital text-amber-300">${Math.round(inc.totalWeightKg).toLocaleString()} kg</td>
             <td class="px-4 py-3">
-              <div class="flex items-center gap-1.5 font-medium text-xs text-slate-200">
-                <span class="w-2 h-2 rounded-full ${isWeight ? 'bg-amber-400' : 'bg-rose-400'}"></span>
-                ${inc.cause}
-              </div>
-            </td>
-            <td class="px-4 py-3 text-xs">
-              <span class="font-digital font-bold text-slate-200">${inc.passengerCount}</span>
-              <span class="text-slate-500 text-[11px]"> / ${window.busState.config.maxPassengerCapacity}</span>
-            </td>
-            <td class="px-4 py-3 text-xs">
-              <span class="font-digital font-bold text-amber-300">${inc.totalWeightKg} kg</span>
-              <span class="text-slate-500 text-[11px]"> / ${window.busState.config.maxPermittedWeightKg} kg</span>
-            </td>
-            <td class="px-4 py-3">
-              <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${badgeColor}">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}">
                 ${inc.severity}
               </span>
             </td>
-            <td class="px-4 py-3 text-xs text-slate-400">
-              ${inc.actionTaken || 'Audio Alarm Triggered'}
-            </td>
+            <td class="px-4 py-3 text-slate-400">${inc.actionTaken}</td>
           </tr>
         `;
       }).join('');
     });
+  }
+
+  // Render individual onboard passenger manifest table
+  renderPassengerRosterTable() {
+    if (!window.busState) return;
+
+    const passengers = window.busState.passengers;
+    const rosterBody = document.getElementById('passengerRosterTableBody');
+    if (!rosterBody) return;
+
+    if (passengers.length === 0) {
+      rosterBody.innerHTML = `
+        <tr>
+          <td colspan="5" class="px-4 py-6 text-center text-slate-500 italic">
+            No passengers currently on board. Bus is empty.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    rosterBody.innerHTML = passengers.map(p => {
+      let weightBadge = 'text-cyan-300';
+      if (p.weight > 85) weightBadge = 'text-rose-400 font-bold';
+      else if (p.weight > 70) weightBadge = 'text-amber-300';
+
+      return `
+        <tr class="hover:bg-slate-800/30 transition text-xs">
+          <td class="px-3 py-2 font-mono-code font-semibold text-cyan-400">${p.id}</td>
+          <td class="px-3 py-2 font-semibold text-white">Seat #${p.seatNumber}</td>
+          <td class="px-3 py-2 font-digital font-bold ${weightBadge}">${p.weight.toFixed(1)} kg</td>
+          <td class="px-3 py-2 text-slate-400 font-mono-code">${p.enteredAt}</td>
+          <td class="px-3 py-2 text-slate-400 truncate max-w-[140px]">${p.stopName}</td>
+        </tr>
+      `;
+    }).join('');
   }
 }
 
